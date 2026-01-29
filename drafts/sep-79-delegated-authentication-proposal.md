@@ -115,7 +115,27 @@ sequenceDiagram
 
 Initialize a 3DS authentication session.
 
-**Request:**
+The `channel` object can be provided here or deferred to the `/authenticate` call. Providing it here allows early validation; deferring allows parallel collection during fingerprinting.
+
+**Request (minimal):**
+```json
+{
+  "merchant_id": "merchant_abc123",
+  "payment_method": {
+    "type": "card",
+    "number": "4917610000000000",
+    "exp_month": "03",
+    "exp_year": "2030",
+    "name": "Jane Doe"
+  },
+  "amount": {
+    "value": 1000,
+    "currency": "EUR"
+  }
+}
+```
+
+**Request (with channel data):**
 ```json
 {
   "merchant_id": "merchant_abc123",
@@ -194,11 +214,52 @@ Initialize a 3DS authentication session.
 
 Submit the result of the fingerprint action. This triggers the Authentication Request (AReq) to the Directory Server.
 
-**Request:**
+If `channel` and other transaction details were not provided in the init call, they **MUST** be provided here.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `fingerprint_completion` | Yes | Result of the 3DS Method fingerprint: `Y` (completed successfully), `N` (timeout/not completed), `U` (unavailable/not performed) |
+
+**Request (if channel provided in init):**
 ```json
 {
   "authentication_token": "eyJ...",
   "fingerprint_completion": "Y"
+}
+```
+
+**Request (if channel deferred from init):**
+```json
+{
+  "authentication_token": "eyJ...",
+  "fingerprint_completion": "Y",
+  "reference": "order_123",
+  "channel": {
+    "type": "browser",
+    "browser": {
+      "accept_header": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "ip_address": "192.168.1.1",
+      "javascript_enabled": true,
+      "language": "en-US",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+      "color_depth": 24,
+      "java_enabled": false,
+      "screen_height": 1080,
+      "screen_width": 1920,
+      "timezone_offset": 0
+    }
+  },
+  "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
+  "billing_address": {
+    "name": "Jane Doe",
+    "line_one": "123 Main Street",
+    "line_two": "Apt 4B",
+    "city": "Amsterdam",
+    "state": "NH",
+    "country": "NL",
+    "postal_code": "1012 AB"
+  },
+  "shopper_email": "shopper@example.com"
 }
 ```
 
