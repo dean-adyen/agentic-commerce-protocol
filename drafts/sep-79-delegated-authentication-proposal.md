@@ -131,20 +131,22 @@ Initialize a 3DS authentication session.
     "currency": "EUR"
   },
   "reference": "order_123",
-  "channel": "browser",
-  "browser_info": {
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
-    "accept_header": "text/html,application/xhtml+xml...",
-    "language": "en-US",
-    "color_depth": 24,
-    "screen_height": 1080,
-    "screen_width": 1920,
-    "timezone_offset": 0,
-    "java_enabled": false,
-    "javascript_enabled": true
+  "channel": {
+    "type": "browser",
+    "browser": {
+      "accept_header": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "ip_address": "192.168.1.1",
+      "javascript_enabled": true,
+      "language": "en-US",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+      "color_depth": 24,
+      "java_enabled": false,
+      "screen_height": 1080,
+      "screen_width": 1920,
+      "timezone_offset": 0
+    }
   },
   "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
-  "ip_address": "192.168.1.1",
   "billing_address": {
     "name": "Jane Doe",
     "line_one": "123 Main Street",

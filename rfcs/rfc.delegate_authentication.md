@@ -32,31 +32,31 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **MAY** are to be interpreted 
 ### 2.1 Initialization
 
 - **Version compatibility:** Agent **MUST** send `API-Version`. Provider **MUST** validate support (e.g., `2026-01-28`).
-- **State management:** Provider **MUST** return an opaque `authentication_token` in every response. Agent **MUST** include the most recent token in all subsequent requests.
+- **Session-based state management:** Provider **MUST** return an opaque `id` (session ID) in the response. Agent **MUST** include this session ID in the URL path for all subsequent requests.
 
-### 2.2 Session Initialization (`/init`)
+### 2.2 Session Initialization (`POST /delegate_authentication`)
 
-- Agent **MUST** issue `POST /delegate_authentication/init` with payment method details, amount, browser info, and callback URL.
-- Provider **MUST** return `authentication_token` and `status`.
+- Agent **MUST** issue `POST /delegate_authentication` with `merchant_id`, payment method details, and amount.
+- Provider performs enrollment check and **MUST** return session `id` and `status`.
 - If `status` is `action_required`, provider **MUST** include an `action` object with `type: fingerprint`.
-- If `status` is `pending`, no browser action is needed; agent proceeds directly to `/authenticate`.
+- If `status` is `pending`, no browser action is needed; agent proceeds directly to `/{id}/authenticate`.
 - If `status` is `not_supported`, authentication is not available for this card (e.g., card not enrolled, issuer not participating in 3DS); agent **SHOULD** proceed directly to authorization without 3DS data.
 
 ### 2.3 Device Fingerprinting (Browser Action)
 
-When `/init` returns `action.type: fingerprint`:
+When `POST /delegate_authentication` returns `action.type: fingerprint`:
 
 1. Agent **MUST** construct the 3DS Method payload containing `threeDSServerTransID` and `threeDSMethodNotificationURL`.
 2. Agent **MUST** base64-encode the payload and POST it as `threeDSMethodData` to `action.fingerprint.three_ds_method_url` via a hidden iframe.
 3. ACS collects device fingerprint and POSTs to the agent's notification URL.
-4. Agent **MUST** call `/authenticate` within 10 seconds with `fingerprint_completion: Y` (success) or `N` (timeout).
-5. If no `action` was returned from `/init`, agent **MUST** call `/authenticate` with `fingerprint_completion: U`.
+4. Agent **MUST** call `/{id}/authenticate` within 10 seconds with `fingerprint_completion: Y` (success) or `N` (timeout).
+5. If no `action` was returned from `POST /delegate_authentication`, agent **MUST** call `/{id}/authenticate` with `fingerprint_completion: U`.
 
-### 2.4 Authentication Request (`/authenticate`)
+### 2.4 Authentication Request (`/{id}/authenticate`)
 
-- Agent **MUST** issue `POST /delegate_authentication/authenticate` with `authentication_token` and `fingerprint_completion` result.
-- Provider initiates authentication.
-- Provider **MUST** return updated `authentication_token` and `status`.
+- Agent **MUST** issue `POST /delegate_authentication/{id}/authenticate` with `fingerprint_completion` result, `channel` object (containing browser data), reference, callback URL, and other transaction details.
+- Provider initiates authentication (AReq to Directory Server).
+- Provider **MUST** return session `id` and `status`.
 
 **Possible status values:**
 - `authenticated`: Frictionless success.
@@ -67,22 +67,22 @@ When `/init` returns `action.type: fingerprint`:
 - `unavailable`: Technical error.
 
 If `status` is `action_required`, provider **MUST** include an `action` object with `type: challenge` and the agent proceeds to the challenge flow.
-If no `action` is returned, agent proceeds to completion `/complete`.
+For all statuses, agent proceeds to `/{id}/complete` to retrieve the full authentication result.
 
 ### 2.5 Challenge Flow (Browser Action)
 
-When `/authenticate` returns `action.type: challenge`:
+When `/{id}/authenticate` returns `action.type: challenge`:
 
 1. Agent **MUST** construct the CReq payload containing `threeDSServerTransID`, `acsTransID`, `messageVersion`, `messageType: CReq`, and `challengeWindowSize`.
 2. Agent **MUST** base64-encode (no padding) and POST it as `creq` to `action.challenge.acs_url` via an iframe/modal.
 3. Shopper completes challenge in the rendered UI.
 4. ACS POSTs `CRes` to agent's `challenge_notification_url`.
 5. Agent **MUST** decode CRes and extract `transStatus`.
-6. Agent **MUST** call `/complete` with `challenge_result` set to the extracted `transStatus`.
+6. Agent **MUST** call `/{id}/complete` with `challenge_result` set to the extracted `transStatus`.
 
-### 2.6 Completion (`/complete`)
+### 2.6 Completion (`/{id}/complete`)
 
-- Agent **MUST** issue `POST /delegate_authentication/complete` with `authentication_token`.
+- Agent **MUST** issue `POST /delegate_authentication/{id}/complete`.
 - After a challenge, agent **MUST** include `challenge_result` (Y/N/U from CRes).
 - Provider **MUST** return final `status` and `authentication_result` containing available 3DS authentication data (trans_status, ECI, cryptogram, transaction IDs, message_version, etc.).
 - The `authentication_result` object **MUST** be returned for all terminal statuses except `unavailable`. Fields are populated based on availability from the authentication response.
@@ -108,7 +108,7 @@ When `/authenticate` returns `action.type: challenge`:
 
 ## 3. HTTP Interface
 
-_TODO: Define `/delegate_authentication/init`, `/delegate_authentication/authenticate`, `/delegate_authentication/complete` endpoints_
+_TODO: Define `POST /delegate_authentication`, `POST /delegate_authentication/{id}/authenticate`, `POST /delegate_authentication/{id}/complete` endpoints_
 
 ---
 
