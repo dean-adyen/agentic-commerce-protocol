@@ -1,8 +1,10 @@
-# SEP #79: Delegated Authentication API Proposal
+# SEP #79: Delegated Authentication API Proposal (Session-Based)
 
 ## Overview
 
 This document proposes universal `delegate_authentication` endpoints for the Agentic Commerce Protocol, enabling merchants to specify their preferred 3DS authentication provider while maintaining parallel execution for optimal latency.
+
+This version uses a **fully session-based** design with the session ID in the URL path, consistent with the Agentic Checkout API pattern.
 
 ### Scope
 
@@ -15,47 +17,35 @@ This specification covers:
 
 ## Design Principles
 
-### Unified State Management via `authentication_token`
+### Session-Based State Management
 
-The API uses a single opaque `authentication_token` field to maintain state between calls. This design accommodates different provider architectures:
+The API uses server-side sessions identified by an opaque `session_id`. The session ID is:
+- Returned in the `POST /delegate_authentication` response
+- Included in the URL path for all subsequent requests
+- Used by the provider to maintain authentication state server-side
 
-| Provider Pattern           | How `authentication_token` is used                                   |
-|----------------------------|----------------------------------------------------------------------|
-| **Token-based/Stateless**  | Contains encrypted state; provider returns a **new token** each step |
-| **Session-based/Stateful** | Contains session ID; **same token** returned throughout              |
-
-**Key Rules:**
-- Token is **opaque** to the agent - treat as a passthrough string
-- `authentication_token` is **always returned** in every response
-- Agent must always use the **most recent token** from the last response
-- Provider may return a new token each step (token-based) or the same token (session-based)
-- All requests after `/init` must include the token in the request body
+This mirrors the checkout session pattern (`/checkout_sessions/{id}`), providing a consistent developer experience across the protocol.
 
 ### Three-Endpoint Design
 
-The API uses three endpoints:
-
 ```
-POST /delegate_authentication/init
-  -> Initialize authentication, get action (fingerprint/none)
+POST /delegate_authentication
+  -> Initialize authentication session, get session_id and action (fingerprint/none)
 
-POST /delegate_authentication/authenticate
+POST /delegate_authentication/{session_id}/authenticate
   -> Submit 3DS Method result (Y/N/U)
   -> Returns next status and action (authenticated/action_required/failed)
 
-POST /delegate_authentication/complete
+POST /delegate_authentication/{session_id}/complete
   -> Retrieve 3DS authentication result (cryptogram, eci, ds_trans_id, etc.)
   -> After challenge: include challenge_result (transStatus from CRes)
 ```
 
 **Simplified Flow:**
-- Frictionless: `/init` -> `/authenticate` (fingerprint) -> `/complete`
-- Challenge: `/init` -> `/authenticate` (fingerprint) -> browser challenge -> `/complete`
+- Frictionless: `POST /delegate_authentication` -> `/{id}/authenticate` (fingerprint) -> `/{id}/complete`
+- Challenge: `POST /delegate_authentication` -> `/{id}/authenticate` (fingerprint) -> browser challenge -> `/{id}/complete`
 
 After a challenge, the agent must pass the `challenge_result` (transStatus from CRes) to `/complete`.
-
----
-
 
 ---
 
@@ -72,15 +62,15 @@ sequenceDiagram
     Consumer->>Agent: Initiate Checkout
     Note over Agent: POST /checkout-sessions/<br/>Returns authentication_provider
 
-    Agent->>AuthProvider: POST /delegate_authentication/init
-    AuthProvider-->>Agent: authentication_token, action: fingerprint
+    Agent->>AuthProvider: POST /delegate_authentication
+    AuthProvider-->>Agent: session_id, action: fingerprint
     Note left of AuthProvider: Includes threeDSServerTransID,<br/>threeDSMethodURL
 
     Agent->>ACS: 3DS Method (browser)
     Note right of Agent: POST to threeDSMethodURL with<br/>threeDSServerTransID + threeDSMethodNotificationURL
     ACS-->>Agent: POST to notification URL
 
-    Agent->>AuthProvider: POST /delegate_authentication/authenticate
+    Agent->>AuthProvider: POST /delegate_authentication/{session_id}/authenticate
     AuthProvider->>DS: AReq (Authentication Request)
     DS->>ACS: AReq
     ACS-->>DS: ARes (Authentication Response)
@@ -88,7 +78,7 @@ sequenceDiagram
 
     alt Frictionless (transStatus: Y)
         AuthProvider-->>Agent: status: authenticated
-        Agent->>AuthProvider: POST /delegate_authentication/complete
+        Agent->>AuthProvider: POST /delegate_authentication/{session_id}/complete
         AuthProvider-->>Agent: 3DS Authentication Result (cryptogram, ECI, ...)
     else Challenge Required (transStatus: C)
         AuthProvider-->>Agent: status: action_required, action: challenge
@@ -100,7 +90,7 @@ sequenceDiagram
         AuthProvider-->>DS: RRes
         DS-->>ACS: RRes
         ACS-->>Agent: CRes (challenge complete)
-        Agent->>AuthProvider: POST /delegate_authentication/complete
+        Agent->>AuthProvider: POST /delegate_authentication/{session_id}/complete
         AuthProvider-->>Agent: 3DS Authentication Result (cryptogram, ECI, ...)
     end
 
@@ -109,11 +99,12 @@ sequenceDiagram
 ```
 
 ---
+
 ## API Specification
 
-### POST /delegate_authentication/init
+### POST /delegate_authentication
 
-Initialize a 3DS authentication session.
+Initialize a 3DS authentication session. This performs enrollment check and returns fingerprint action if supported.
 
 **Request:**
 ```json
@@ -129,7 +120,57 @@ Initialize a 3DS authentication session.
   "amount": {
     "value": 1000,
     "currency": "EUR"
-  },
+  }
+}
+```
+
+**Response (fingerprint required):**
+```json
+{
+  "id": "auth_session_abc123",
+  "status": "action_required",
+  "action": {
+    "type": "fingerprint",
+    "fingerprint": {
+      "three_ds_method_url": "https://acs.issuer.com/3dsmethod",
+      "three_ds_server_trans_id": "abc-123-def"
+    }
+  }
+}
+```
+
+**Response (no action needed):**
+```json
+{
+  "id": "auth_session_abc123",
+  "status": "pending"
+}
+```
+
+**Response (not supported):**
+```json
+{
+  "id": "auth_session_abc123",
+  "status": "not_supported",
+  "reason": "card_not_enrolled"
+}
+```
+
+**Possible status values:**
+- `action_required` - Process the `action` object (fingerprint)
+- `pending` - No action needed, call `/{id}/authenticate` directly
+- `not_supported` - Authentication not supported (card not enrolled, issuer not participating, etc.) - proceed to authorization without 3DS
+
+---
+
+### POST /delegate_authentication/{session_id}/authenticate
+
+Submit the result of the fingerprint action along with browser and transaction details. This triggers the Authentication Request (AReq) to the Directory Server.
+
+**Request:**
+```json
+{
+  "fingerprint_completion": "Y",
   "reference": "order_123",
   "channel": "browser",
   "browser_info": {
@@ -158,52 +199,10 @@ Initialize a 3DS authentication session.
 }
 ```
 
-**Response (fingerprint required):**
-```json
-{
-  "authentication_token": "eyJ...",
-  "status": "action_required",
-  "action": {
-    "type": "fingerprint",
-    "fingerprint": {
-      "three_ds_method_url": "https://acs.issuer.com/3dsmethod",
-      "three_ds_server_trans_id": "abc-123-def"
-    }
-  }
-}
-```
-
-**Response (no action needed):**
-```json
-{
-  "authentication_token": "eyJ...",
-  "status": "pending"
-}
-```
-
-**Possible status values:**
-- `action_required` - Process the `action` object (fingerprint)
-- `pending` - No action needed, call `/authenticate` directly
-- `not_supported` - Authentication not supported (card not enrolled, issuer not participating, etc.) - proceed to authorization without 3DS
-
----
-
-### POST /delegate_authentication/authenticate
-
-Submit the result of the fingerprint action. This triggers the Authentication Request (AReq) to the Directory Server.
-
-**Request:**
-```json
-{
-  "authentication_token": "eyJ...",
-  "fingerprint_completion": "Y"
-}
-```
-
 **Response (frictionless - authenticated):**
 ```json
 {
-  "authentication_token": "eyJ...",
+  "id": "auth_session_abc123",
   "status": "authenticated"
 }
 ```
@@ -211,7 +210,7 @@ Submit the result of the fingerprint action. This triggers the Authentication Re
 **Response (challenge required):**
 ```json
 {
-  "authentication_token": "eyJ...",
+  "id": "auth_session_abc123",
   "status": "action_required",
   "action": {
     "type": "challenge",
@@ -233,38 +232,18 @@ Submit the result of the fingerprint action. This triggers the Authentication Re
 - `rejected` - Issuer rejected, do not attempt authorization
 - `unavailable` - Technical error
 
-For all statuses, agent proceeds to `/complete` to retrieve the full 3DS authentication result.
+For all statuses, agent proceeds to `/{id}/complete` to retrieve the full 3DS authentication result.
 
 ---
 
-### POST /delegate_authentication/complete
+### POST /delegate_authentication/{session_id}/complete
 
-Always called to retrieve the 3DS authentication result. After a challenge flow, the agent must include the `challenge_result` from the decoded CRes.
-
-**Request (frictionless - no challenge):**
-```json
-{
-  "authentication_token": "eyJ..."
-}
-```
-
-**Request (after challenge):**
-```json
-{
-  "authentication_token": "eyJ...",
-  "challenge_result": "Y"
-}
-```
-
-| Field                  | Required        | Description                                                                       |
-|------------------------|-----------------|-----------------------------------------------------------------------------------|
-| `authentication_token` | Yes             | Token from previous response                                                      |
-| `challenge_result`     | After challenge | `transStatus` from decoded CRes: Y (success), N (failed), U (unavailable/timeout) |
+Always called to retrieve the 3DS authentication result.
 
 **Response (authenticated):**
 ```json
 {
-  "authentication_token": "eyJ...",
+  "id": "auth_session_abc123",
   "status": "authenticated",
   "authentication_result": {
     "trans_status": "Y",
@@ -281,7 +260,7 @@ Always called to retrieve the 3DS authentication result. After a challenge flow,
 **Response (not authenticated):**
 ```json
 {
-  "authentication_token": "eyJ...",
+  "id": "auth_session_abc123",
   "status": "not_authenticated",
   "authentication_result": {
     "trans_status": "N",
@@ -298,7 +277,7 @@ Always called to retrieve the 3DS authentication result. After a challenge flow,
 **Response (rejected):**
 ```json
 {
-  "authentication_token": "eyJ...",
+  "id": "auth_session_abc123",
   "status": "rejected",
   "authentication_result": {
     "trans_status": "R",
@@ -327,18 +306,18 @@ The `action` field is an optional object that describes what client-side browser
 
 When no action is needed, the `action` field is **omitted entirely**.
 
-All API calls (`/authenticate`, `/complete`) are made by the agent's **server**, not the browser.
+All API calls (`/{id}/authenticate`, `/{id}/complete`) are made by the agent's **server**, not the browser.
 
-| Endpoint        | Action Type    | Meaning                                                                                  |
-|-----------------|----------------|------------------------------------------------------------------------------------------|
-| `/init`         | `fingerprint`  | Browser does fingerprint, ACS calls notification URL, agent server calls `/authenticate` |
-| `/init`         | _(omitted)_    | No fingerprint needed, agent server calls `/authenticate` directly with `U`              |
-| `/authenticate` | `challenge`    | Browser does challenge, ACS calls notification URL, agent server calls `/complete`       |
-| `/authenticate` | _(omitted)_    | Frictionless success, agent server calls `/complete` directly                            |
+| Endpoint          | Action Type    | Meaning                                                                                    |
+|-------------------|----------------|--------------------------------------------------------------------------------------------|
+| `POST /delegate_authentication` | `fingerprint`  | Browser does fingerprint, ACS calls notification URL, agent server calls `/{id}/authenticate` |
+| `POST /delegate_authentication` | _(omitted)_    | No fingerprint needed, agent server calls `/{id}/authenticate` directly with `U`            |
+| `/{id}/authenticate` | `challenge`    | Browser does challenge, ACS calls notification URL, agent server calls `/{id}/complete`     |
+| `/{id}/authenticate` | _(omitted)_    | Frictionless success, agent server calls `/{id}/complete` directly                          |
 
 ### `fingerprint` Action
 
-Returned by `/init` when the issuer's ACS supports device fingerprinting.
+Returned by `POST /delegate_authentication` when the issuer's ACS supports device fingerprinting.
 
 ```json
 {
@@ -370,12 +349,12 @@ Base64 encodes it, POSTs as `threeDSMethodData` to `three_ds_method_url`.
 1. Browser loads hidden iframe, POSTs `threeDSMethodData` to `three_ds_method_url`
 2. ACS collects device fingerprint
 3. ACS POSTs to `threeDSMethodNotificationURL` (agent's server)
-4. Agent server calls `/authenticate` with `fingerprint_completion: Y` (or `N` on timeout)
+4. Agent server calls `/{id}/authenticate` with `fingerprint_completion: Y` (or `N` on timeout)
 5. Agent server returns HTML with `postMessage` to notify browser
 
 ### `challenge` Action
 
-Returned by `/authenticate` when the issuer requires cardholder verification.
+Returned by `/{id}/authenticate` when the issuer requires cardholder verification.
 
 ```json
 {
@@ -414,7 +393,7 @@ Base64 encodes it (no padding), POSTs as `creq` to `acs_url`.
 1. Browser renders iframe/modal, POSTs `creq` to `acs_url`
 2. Shopper completes challenge
 3. ACS POSTs `CRes` to `challenge_notification_url` (agent's server)
-4. Agent decodes CRes, extracts `transStatus`, calls `/complete` with `challenge_result`
+4. Agent decodes CRes, extracts `transStatus`, calls `/{id}/complete` with `challenge_result`
 5. Agent server returns HTML with `postMessage` to notify browser
 
 ### No Action
@@ -422,8 +401,8 @@ Base64 encodes it (no padding), POSTs as `creq` to `acs_url`.
 When no browser work is required, the `action` field is omitted entirely from the response.
 
 **When omitted:**
-- From `/init`: ACS doesn't support fingerprinting - agent server calls `/authenticate` directly with `fingerprint_completion: U`
-- From `/authenticate`: Frictionless success - agent server calls `/complete` directly
+- From `POST /delegate_authentication`: ACS doesn't support fingerprinting - agent server calls `/{id}/authenticate` directly with `fingerprint_completion: U`
+- From `/{id}/authenticate`: Frictionless success - agent server calls `/{id}/complete` directly
 
 ---
 
@@ -441,6 +420,7 @@ cres=eyJ0cmFuc1N0YXR1cyI6IlkiLCJ0aHJlZURTU2VydmVyVHJhbnNJRCI6IjEyMzQ1Njc4LTEyMzQ
 ```
 Decoded: `{ "transStatus": "Y", "threeDSServerTransID": "12345678-..." }`
 
+
 ---
 
 ## Next Steps
@@ -450,4 +430,3 @@ Decoded: `{ "transStatus": "Y", "threeDSServerTransID": "12345678-..." }`
 3. Define error codes and handling
 4. Define callback specifications
 5. Define provider adapter requirements
-
