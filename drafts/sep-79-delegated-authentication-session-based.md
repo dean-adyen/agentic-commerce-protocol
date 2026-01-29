@@ -141,7 +141,7 @@ The `channel` object can be provided here or deferred to the `/{id}/authenticate
     "value": 1000,
     "currency": "EUR"
   },
-  "reference": "order_123",
+  "checkout_session_id": "checkout_session_123",
   "channel": {
     "type": "browser",
     "browser": {
@@ -157,17 +157,27 @@ The `channel` object can be provided here or deferred to the `/{id}/authenticate
       "timezone_offset": 0
     }
   },
-  "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
-  "billing_address": {
-    "name": "Jane Doe",
-    "line_one": "123 Main Street",
-    "line_two": "Apt 4B",
-    "city": "Amsterdam",
-    "state": "NH",
-    "country": "NL",
-    "postal_code": "1012 AB"
+  "flow_preference": {
+    "type": "challenge",
+    "challenge": {
+      "type": "preferred"
+    }
   },
-  "shopper_email": "shopper@example.com"
+  "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
+  "shopper_details": {
+    "name": "Jane Doe",
+    "email": "shopper@example.com",
+    "phone_number": "15551234567",
+    "address": {
+      "name": "Jane Doe",
+      "line_one": "123 Main Street",
+      "line_two": "Apt 4B",
+      "city": "Amsterdam",
+      "state": "NH",
+      "country": "NL",
+      "postal_code": "1012 AB"
+    }
+  }
 }
 ```
 
@@ -231,7 +241,7 @@ If `channel` and other transaction details were not provided in the init call, t
 ```json
 {
   "fingerprint_completion": "Y",
-  "reference": "order_123",
+  "checkout_session_id": "checkout_session_123",
   "channel": {
     "type": "browser",
     "browser": {
@@ -248,16 +258,20 @@ If `channel` and other transaction details were not provided in the init call, t
     }
   },
   "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
-  "billing_address": {
+  "shopper_details": {
     "name": "Jane Doe",
-    "line_one": "123 Main Street",
-    "line_two": "Apt 4B",
-    "city": "Amsterdam",
-    "state": "NH",
-    "country": "NL",
-    "postal_code": "1012 AB"
-  },
-  "shopper_email": "shopper@example.com"
+    "email": "shopper@example.com",
+    "phone_number": "15551234567",
+    "address": {
+      "name": "Jane Doe",
+      "line_one": "123 Main Street",
+      "line_two": "Apt 4B",
+      "city": "Amsterdam",
+      "state": "NH",
+      "country": "NL",
+      "postal_code": "1012 AB"
+    }
+  }
 }
 ```
 
@@ -370,12 +384,12 @@ When no action is needed, the `action` field is **omitted entirely**.
 
 All API calls (`/{id}/authenticate`, `/{id}/complete`) are made by the agent's **server**, not the browser.
 
-| Endpoint          | Action Type    | Meaning                                                                                    |
-|-------------------|----------------|--------------------------------------------------------------------------------------------|
-| `POST /delegate_authentication` | `fingerprint`  | Browser does fingerprint, ACS calls notification URL, agent server calls `/{id}/authenticate` |
-| `POST /delegate_authentication` | _(omitted)_    | No fingerprint needed, agent server calls `/{id}/authenticate` directly with `U`            |
-| `/{id}/authenticate` | `challenge`    | Browser does challenge, ACS calls notification URL, agent server calls `/{id}/complete`     |
-| `/{id}/authenticate` | _(omitted)_    | Frictionless success, agent server calls `/{id}/complete` directly                          |
+| Endpoint                        | Action Type    | Meaning                                                                                         |
+|---------------------------------|----------------|-------------------------------------------------------------------------------------------------|
+| `POST /delegate_authentication` | `fingerprint`  | Browser does fingerprint, ACS calls notification URL, agent server calls `/{id}/authenticate`   |
+| `POST /delegate_authentication` | _(omitted)_    | No fingerprint needed, agent server calls `/{id}/authenticate` directly with `U`                |
+| `/{id}/authenticate`            | `challenge`    | Browser does challenge, ACS calls notification URL, agent server calls `/{id}/complete`         |
+| `/{id}/authenticate`            | _(omitted)_    | Frictionless success, agent server calls `/{id}/complete` directly                              |
 
 ### `fingerprint` Action
 

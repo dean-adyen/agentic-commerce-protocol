@@ -150,7 +150,7 @@ The `channel` object can be provided here or deferred to the `/authenticate` cal
     "value": 1000,
     "currency": "EUR"
   },
-  "reference": "order_123",
+  "checkout_session_id": "checkout_session_123",
   "channel": {
     "type": "browser",
     "browser": {
@@ -166,17 +166,27 @@ The `channel` object can be provided here or deferred to the `/authenticate` cal
       "timezone_offset": 0
     }
   },
-  "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
-  "billing_address": {
-    "name": "Jane Doe",
-    "line_one": "123 Main Street",
-    "line_two": "Apt 4B",
-    "city": "Amsterdam",
-    "state": "NH",
-    "country": "NL",
-    "postal_code": "1012 AB"
+  "flow_preference": {
+    "type": "challenge",
+    "challenge": {
+      "type": "preferred"
+    }
   },
-  "shopper_email": "shopper@example.com"
+  "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
+  "shopper_details": {
+    "name": "Jane Doe",
+    "email": "shopper@example.com",
+    "phone_number": "15551234567",
+    "address": {
+      "name": "Jane Doe",
+      "line_one": "123 Main Street",
+      "line_two": "Apt 4B",
+      "city": "Amsterdam",
+      "state": "NH",
+      "country": "NL",
+      "postal_code": "1012 AB"
+    }
+  }
 }
 ```
 
@@ -233,7 +243,7 @@ If `channel` and other transaction details were not provided in the init call, t
 {
   "authentication_token": "eyJ...",
   "fingerprint_completion": "Y",
-  "reference": "order_123",
+  "checkout_session_id": "checkout_session_123",
   "channel": {
     "type": "browser",
     "browser": {
@@ -250,16 +260,20 @@ If `channel` and other transaction details were not provided in the init call, t
     }
   },
   "challenge_notification_url": "https://agent.example.com/3ds/challenge-callback",
-  "billing_address": {
+  "shopper_details": {
     "name": "Jane Doe",
-    "line_one": "123 Main Street",
-    "line_two": "Apt 4B",
-    "city": "Amsterdam",
-    "state": "NH",
-    "country": "NL",
-    "postal_code": "1012 AB"
-  },
-  "shopper_email": "shopper@example.com"
+    "email": "shopper@example.com",
+    "phone_number": "15551234567",
+    "address": {
+      "name": "Jane Doe",
+      "line_one": "123 Main Street",
+      "line_two": "Apt 4B",
+      "city": "Amsterdam",
+      "state": "NH",
+      "country": "NL",
+      "postal_code": "1012 AB"
+    }
+  }
 }
 ```
 
