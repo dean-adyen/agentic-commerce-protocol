@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Agentic Commerce — Delegate Authentication API
+  title: Agentic Commerce - Delegate Authentication API
   version: "2026-01-28"
   description: |
     Delegate consumer authentication (3D Secure) to merchant-specified providers.

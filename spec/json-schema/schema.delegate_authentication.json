@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/delegate-authentication/bundle.schema.json",
-  "title": "Delegate Authentication — Schema Bundle",
+  "title": "Delegate Authentication - Schema Bundle",
   "$defs": {
     "Address": {
       "type": "object",

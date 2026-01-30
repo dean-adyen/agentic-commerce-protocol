@@ -79,7 +79,7 @@ All endpoints **MUST** use HTTPS and return JSON.
   "type": "invalid_request",
   "code": "invalid_card",
   "message": "Missing/malformed field",
-  "param": "payment_method.number"
+  "param": "$.payment_method.number"
 }
 ```
 
@@ -438,7 +438,7 @@ When authenticate returns `action.type: challenge`:
   "type": "invalid_request",
   "code": "invalid_card",
   "message": "Invalid expiry date (exp_month or exp_year)",
-  "param": "payment_method.exp_month"
+  "param": "$.payment_method.exp_month"
 }
 ```
 
