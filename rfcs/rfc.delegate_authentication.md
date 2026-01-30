@@ -33,7 +33,7 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **MAY** are to be interpreted 
 
 - **Versioning:** Client **MUST** send `API-Version`. Server **MUST** validate support (e.g., `2026-01-28`).
 - **Identity/Signing:** Server **SHOULD** publish acceptable signature algorithms out-of-band; client **SHOULD** sign requests (`Signature`) over canonical JSON with an accompanying `Timestamp` (RFC 3339).
-- **Session-based state:** Server **MUST** return an opaque `authentication_session_id`. Client **MUST** include this ID in the URL path for all subsequent requests.
+- **Session-based state:** Server **MUST** return an `authentication_session_id`. Client **MUST** include this ID in the URL path for all subsequent requests.
 
 ### 2.2 Authentication Lifecycle
 
@@ -129,7 +129,7 @@ All endpoints **MUST** use HTTPS and return JSON.
 **Response body:**
 
 - `authentication_session_id` (string) - Session ID
-- `status` - `authenticated | action_required | attempted | not_authenticated | rejected | unavailable`
+- `status` - `authenticated | action_required | attempted | not_authenticated | rejected | unavailable | expired`
 - `action` (optional) - Object with `type: challenge` and challenge details
 
 ### 4.3 Complete
@@ -139,7 +139,7 @@ All endpoints **MUST** use HTTPS and return JSON.
 **Response body:**
 
 - `authentication_session_id` (string) - Session ID
-- `status` - `authenticated | attempted | not_authenticated | rejected | unavailable`
+- `status` - `authenticated | attempted | not_authenticated | rejected | unavailable | expired | challenge_abandoned`
 - `authentication_result` - Object with 3DS data (trans_status, eci, cryptogram, ds_trans_id, three_ds_server_trans_id, message_version, etc.)
 
 ---
@@ -214,8 +214,8 @@ When authenticate returns `action.type: challenge`:
 - `payment_method.type` **MUST** be `card`.
 - `payment_method.number` present (string).
 - When present:
-  - `exp_month` length ≤ 2 and value `"01"`-`"12"`.
-  - `exp_year` length ≤ 4 and four digits.
+    - `exp_month` length ≤ 2 and value `"01"`-`"12"`.
+    - `exp_year` length ≤ 4 and four digits.
 
 **Amount:**
 - `amount.value` **MUST** be a positive integer (minor units).
@@ -236,8 +236,8 @@ When authenticate returns `action.type: challenge`:
 **Status Values:**
 - `fingerprint_completion` ∈ `Y | N | U`.
 - Create `status` ∈ `action_required | pending | not_supported`.
-- Authenticate `status` ∈ `authenticated | action_required | attempted | not_authenticated | rejected | unavailable`.
-- Complete `status` ∈ `authenticated | attempted | not_authenticated | rejected | unavailable`.
+- Authenticate `status` ∈ `authenticated | action_required | attempted | not_authenticated | rejected | unavailable | expired`.
+- Complete `status` ∈ `authenticated | attempted | not_authenticated | rejected | unavailable | expired | challenge_abandoned`.
 
 ---
 

@@ -307,6 +307,7 @@ If `channel` and other transaction details were not provided in the init call, t
 - `not_authenticated` - Authentication failed
 - `rejected` - Issuer rejected, do not attempt authorization
 - `unavailable` - Technical error
+- `expired` - Session has expired
 
 For all statuses, agent proceeds to `/{id}/complete` to retrieve the full 3DS authentication result.
 
@@ -371,6 +372,8 @@ Always called to retrieve the 3DS authentication result.
 - `not_authenticated` - Authentication failed
 - `rejected` - Issuer rejected, do not attempt authorization
 - `unavailable` - Technical error retrieving result
+- `expired` - Session has expired
+- `challenge_abandoned` - Challenge was presented but shopper did not complete it
 
 The `authentication_result` object is returned for all terminal statuses except `unavailable`. Fields are populated based on availability from the authentication response.
 
