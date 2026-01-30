@@ -476,7 +476,6 @@ components:
           properties:
             authentication_result:
               $ref: "#/components/schemas/AuthenticationResult"
-          required: [authentication_result]
 
     # Data Models
     PaymentMethod:
@@ -564,6 +563,18 @@ components:
           type: integer
           description: Timezone offset in minutes (required if javascript_enabled is true)
       required: [accept_header, ip_address, javascript_enabled, language, user_agent]
+      allOf:
+        - if:
+            properties:
+              javascript_enabled:
+                const: true
+          then:
+            required:
+              - color_depth
+              - java_enabled
+              - screen_height
+              - screen_width
+              - timezone_offset
 
     FlowPreference:
       type: object
@@ -649,6 +660,15 @@ components:
         challenge:
           $ref: "#/components/schemas/ChallengeAction"
       required: [type]
+      oneOf:
+        - properties:
+            type:
+              const: fingerprint
+          required: [fingerprint]
+        - properties:
+            type:
+              const: challenge
+          required: [challenge]
 
     FingerprintAction:
       type: object
@@ -724,10 +744,10 @@ components:
           enum: [invalid_request, rate_limit_exceeded, processing_error, service_unavailable]
         code:
           type: string
-          description: Implementation-defined error code
+          enum: [invalid_card, duplicate_request, idempotency_conflict]
         message:
           type: string
         param:
           type: string
-          description: RFC 9535 JSONPath of offending field
+          description: RFC 9535 JSONPath (optional)
       required: [type, code, message]
