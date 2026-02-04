@@ -63,7 +63,7 @@ All endpoints **MUST** use HTTPS and return JSON.
 - `User-Agent: <string>` (OPTIONAL)
 - `Idempotency-Key: <string>` (RECOMMENDED)
 - `Request-Id: <string>` (RECOMMENDED)
-- `Signature: <base64url>` (RECOMMENDED; identity verification over canonical request)
+- `Signature: <base64url>` (**REQUIRED**; identity verification over canonical request)
 - `Timestamp: <RFC3339>` (RECOMMENDED)
 - `API-Version: 2026-01-28` (**REQUIRED**)
 
@@ -217,11 +217,13 @@ When authenticate returns `action.type: challenge`:
 ## 8. Security Considerations
 
 - **Authentication:** `Authorization: Bearer <token>` **REQUIRED**.
-- **Integrity:** `Signature` over canonical JSON **SHOULD** be verified (algorithm policy advertised out-of-band).
+- **Integrity:** `Signature` over canonical JSON **MUST** be verified (algorithm policy advertised out-of-band).
 - **Freshness:** `Timestamp` **SHOULD** be required and checked within an acceptable clock-skew window.
 - **PII/PCI:** Card data handling **MUST** follow applicable PCI DSS requirements; logs **MUST NOT** contain full PAN or CVC.
 - **Transport:** All requests **MUST** use HTTPS/TLS 1.2+.
 - **Callback verification:** Client **SHOULD** validate callback origin where possible.
+- **Agent Infrastructure Allowlisting:** Authentication Providers **MUST** enforce origin restrictions to prevent abuse, 
+and requests can only be accepted if it originates from the Agent's verified infrastructure.
 
 ---
 
