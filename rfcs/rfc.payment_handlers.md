@@ -515,7 +515,12 @@ All handlers leverage tokenization to secure credentials:
     "accepted_brands": ["visa", "mastercard", "amex"],
     "accepted_funding_types": ["credit", "debit"],
     "psp": "stripe",
-    "environment": "production"
+    "environment": "production",
+    "authentication": {
+      "provider": "adyen",
+      "merchant_id": "acct_1234567890",
+      "supported_methods": ["3ds"]
+    }
   }
 }
 ```
@@ -896,6 +901,69 @@ Specific handlers may require additional fields (e.g., `accepted_brands` for `de
       "type": "string",
       "enum": ["sandbox", "production"],
       "description": "Environment for this handler instance"
+    },
+    "authentication": {
+      "type": "object",
+      "description": "Configuration for delegated consumer authentication (3DS). If present, Agent MUST perform delegated authentication with this provider.",
+      "required": ["provider", "merchant_id"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Identifier of the Authentication Provider",
+          "examples": ["stripe", "adyen", "braintree", "checkout"],
+        },
+        "merchant_id": {
+          "type": "string",
+          "description": "Merchant identifier specifically for the authentication provider"
+        },
+        "supported_methods": {
+          "type": "array",
+          "items": { 
+            "type": "string", 
+            "enum": ["3ds"] 
+          },
+          "default": ["3ds"]
+        },
+        "acquirer_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Details about the acquirer used for this 3DS Authentication. Required for AReq construction.",
+          "required": [
+            "acquirer_bin",
+            "acquirer_country",
+            "acquirer_merchant_id",
+            "merchant_name"
+          ],
+          "properties": {
+            "acquirer_bin": {
+              "type": "string",
+              "maxLength": 11,
+              "description": "The Acquirer BIN (directory-server specific)."
+            },
+            "acquirer_country": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2,
+              "description": "Two-letter ISO 3166-1 alpha-2 country code."
+            },
+            "acquirer_merchant_id": {
+              "type": "string",
+              "maxLength": 35,
+              "description": "The Merchant ID assigned by the acquirer."
+            },
+            "merchant_name": {
+              "type": "string",
+              "maxLength": 40,
+              "description": "Merchant name assigned by the acquirer."
+            },
+            "requestor_id": {
+              "type": "string",
+              "maxLength": 35,
+              "description": "Requestor ID (if required by the directory server)."
+            }
+          }
+        }
+      }
     }
   },
   "additionalProperties": false
@@ -921,7 +989,19 @@ Specific handlers may require additional fields (e.g., `accepted_brands` for `de
     "accepted_funding_types": ["credit", "debit"],
     "supports_3ds": true,
     "3ds_versions": ["2.2", "2.3"],
-    "environment": "production"
+    "environment": "production",
+    "authentication": {
+      "provider": "adyen",
+      "merchant_id": "acct_1234567890",
+      "supported_methods": ["3ds"],
+      "acquirer_details": {
+        "acquirer_bin": "412345",
+        "acquirer_country": "US",
+        "acquirer_merchant_id": "123456789012345",
+        "merchant_name": "Example Merchant Inc",
+        "requestor_id": "REQ_12345"
+      }
+    }
   }
 }
 ```
@@ -994,9 +1074,11 @@ All handler-specific schemas follow this extension pattern:
 
 ## 11. Change Log
 
+- **2026-02-12**: Added normative `authentication` object to `dev.acp.tokenized.card` config schema to support delegated 3DS providers.
 - **2026-01-22**: Initial draft — Foundation and terminology for payment handlers framework, branched from `main`
 - **2026-01-22**: Added complete JSON schemas for handlers, instruments, and credentials
 - **2026-01-22**: Defined base handler patterns and ACP reference implementation for card tokenization
 - **2026-01-22**: Integrated with existing `delegate_payment` API
 
 ---
+

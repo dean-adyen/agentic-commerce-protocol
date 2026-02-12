@@ -80,7 +80,12 @@
               "accepted_funding_types": ["credit", "debit"],
               "supports_3ds": true,
               "3ds_versions": ["2.1.0", "2.2.0"],
-              "environment": "production"
+              "environment": "production",
+              "authentication": {
+                "provider": "adyen",
+                "merchant_id": "merch_auth_98765",
+                "supported_methods": ["3ds"]
+              }
             }
           },
           {
